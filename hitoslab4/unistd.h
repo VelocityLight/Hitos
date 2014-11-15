@@ -188,17 +188,20 @@ return -1; \
 
 #endif /* __LIBRARY__ */
 
-/* 定义信号量结构体,free表是否空闲,sem_value表当前的值(有初始化，输入value)，*task_wait为等待信号量，name表示信号量名字*/
 #define SEM_LEN 33
-typedef struct OURSEMS{
-	char sem_name[SEM_LEN];
+#define SEM_NUM 10
+typedef struct LIST{
+	struct task_struct *task;
+	struct LIST *next;
+}lists;
+
+typedef struct oursem{
+	char name[SEM_LEN];
+	int value;
 	int free;
-	int sem_value;
-	struct task_struct* waittt;
+	lists *list;
 }sem_t;
 
-
-void sem_init();
 extern int errno;
 
 int access(const char * filename, mode_t mode);
