@@ -1,0 +1,156 @@
+以下内容为个人思考，欢迎学长，老师纠错。
+问题一.我认为最重要的步骤如下：
+第一，通过“u /7”获得反汇编代码后，运行“sreg”获得LDT段表的物理地址的起点ldtr。因为由反汇编知道变量i处于ds段，然后想要通过段表找到ds的具体信息，这一步比较重要。结果如下：
+<bochs:4> u /7
+10000063: (                    ): cmp dword ptr ds:0x3004, 0x00000000 ; 833d0430000000
+1000006a: (                    ): jz .+0x00000004           ; 7404
+1000006c: (                    ): jmp .+0xfffffff5          ; ebf5
+1000006e: (                    ): add byte ptr ds:[eax], al ; 0000
+10000070: (                    ): xor eax, eax              ; 31c0
+10000072: (                    ): jmp .+0x00000000          ; eb00
+10000074: (                    ): leave                     ; c9
+<bochs:5> sreg
+cs:s=0x000f, dl=0x00000002, dh=0x10c0fa00, valid=1
+ds:s=0x0017, dl=0x00003fff, dh=0x10c0f300, valid=3
+ss:s=0x0017, dl=0x00003fff, dh=0x10c0f300, valid=1
+es:s=0x0017, dl=0x00003fff, dh=0x10c0f300, valid=1
+fs:s=0x0017, dl=0x00003fff, dh=0x10c0f300, valid=1
+gs:s=0x0017, dl=0x00003fff, dh=0x10c0f300, valid=1
+ldtr:s=0x0068, dl=0x72d00068, dh=0x000082fa, valid=1
+tr:s=0x0060, dl=0x72e80068, dh=0x00008bfa, valid=1
+gdtr:base=0x00005cb8, limit=0x7ff
+idtr:base=0x000054b8, limit=0x7ff
+
+第二，查找GDT表的第十三项，通过组合获得LDT物理地址，再查找LDT前四项内容很重要。运行结果如下：
+<bochs:7> xp /2w 0x00005cb8 + 13*8      
+[bochs]:
+0x00005d20 <bogus+       0>:	0x72d00068	0x000082fa
+<bochs:8> xp /8w 0x00fa72d0
+[bochs]:
+0x00fa72d0 <bogus+       0>:	0x00000000	0x00000000	0x00000002	0x10c0fa00
+0x00fa72e0 <bogus+      16>:	0x00003fff	0x10c0f300	0x00000000	0x00fa8000
+
+第三，查找页表，找到第65个页目录项，然后通过页表的物理内存第三项页表项恒重要。运行结果如下：
+<bochs:13> xp /w 0+64*4
+[bochs]:
+0x00000100 <bogus+       0>:	0x00faa027
+<bochs:14> xp /w 0x00faa000+3*4
+[bochs]:
+0x00faa00c <bogus+       0>:	0x00fa9067
+
+
+通过几个重要步骤，最后获得i的物理地址并修改。总体的运行结果如下：
+light@light:~/oslab$ ./dbg-asm
+========================================================================
+                       Bochs x86 Emulator 2.3.7
+               Build from CVS snapshot, on June 3, 2008
+========================================================================
+00000000000i[     ] reading configuration from ./bochs/bochsrc.bxrc
+00000000000i[     ] installing x module as the Bochs GUI
+00000000000i[     ] using log file ./bochsout.txt
+Next at t=0
+(0) [0xfffffff0] f000:fff0 (unk. ctxt): jmp far f000:e05b         ; ea5be000f0
+<bochs:1> c
+^CNext at t=128140268
+(0) [0x00fc806a] 000f:0000006a (unk. ctxt): jz .+0x00000004 (0x10000070) ; 7404
+<bochs:2> n
+Next at t=128140269
+(0) [0x00fc806c] 000f:0000006c (unk. ctxt): jmp .+0xfffffff5 (0x10000063) ; ebf5
+<bochs:3> n
+Next at t=128140270
+(0) [0x00fc8063] 000f:00000063 (unk. ctxt): cmp dword ptr ds:0x3004, 0x00000000 ; 833d0430000000
+<bochs:4> u /7
+10000063: (                    ): cmp dword ptr ds:0x3004, 0x00000000 ; 833d0430000000
+1000006a: (                    ): jz .+0x00000004           ; 7404
+1000006c: (                    ): jmp .+0xfffffff5          ; ebf5
+1000006e: (                    ): add byte ptr ds:[eax], al ; 0000
+10000070: (                    ): xor eax, eax              ; 31c0
+10000072: (                    ): jmp .+0x00000000          ; eb00
+10000074: (                    ): leave                     ; c9
+<bochs:5> sreg
+cs:s=0x000f, dl=0x00000002, dh=0x10c0fa00, valid=1
+ds:s=0x0017, dl=0x00003fff, dh=0x10c0f300, valid=3
+ss:s=0x0017, dl=0x00003fff, dh=0x10c0f300, valid=1
+es:s=0x0017, dl=0x00003fff, dh=0x10c0f300, valid=1
+fs:s=0x0017, dl=0x00003fff, dh=0x10c0f300, valid=1
+gs:s=0x0017, dl=0x00003fff, dh=0x10c0f300, valid=1
+ldtr:s=0x0068, dl=0x72d00068, dh=0x000082fa, valid=1
+tr:s=0x0060, dl=0x72e80068, dh=0x00008bfa, valid=1
+gdtr:base=0x00005cb8, limit=0x7ff
+idtr:base=0x000054b8, limit=0x7ff
+<bochs:6> xp /32w 0x00005cb8        
+[bochs]:
+0x00005cb8 <bogus+       0>:	0x00000000	0x00000000	0x00000fff	0x00c09a00
+0x00005cc8 <bogus+      16>:	0x00000fff	0x00c09300	0x00000000	0x00000000
+0x00005cd8 <bogus+      32>:	0xa4480068	0x00008901	0xa4300068	0x00008201
+0x00005ce8 <bogus+      48>:	0xf2e80068	0x000089ff	0xf2d00068	0x000082ff
+0x00005cf8 <bogus+      64>:	0xd2e80068	0x000089ff	0xd2d00068	0x000082ff
+0x00005d08 <bogus+      80>:	0x12e80068	0x000089fc	0x12d00068	0x000082fc
+0x00005d18 <bogus+      96>:	0x72e80068	0x00008bfa	0x72d00068	0x000082fa
+0x00005d28 <bogus+     112>:	0x00000000	0x00000000	0x00000000	0x00000000
+<bochs:7> xp /2w 0x00005cb8 + 13*8      
+[bochs]:
+0x00005d20 <bogus+       0>:	0x72d00068	0x000082fa
+<bochs:8> xp /8w 0x00fa72d0
+[bochs]:
+0x00fa72d0 <bogus+       0>:	0x00000000	0x00000000	0x00000002	0x10c0fa00
+0x00fa72e0 <bogus+      16>:	0x00003fff	0x10c0f300	0x00000000	0x00fa8000
+<bochs:9> sreg
+cs:s=0x000f, dl=0x00000002, dh=0x10c0fa00, valid=1
+ds:s=0x0017, dl=0x00003fff, dh=0x10c0f300, valid=3
+ss:s=0x0017, dl=0x00003fff, dh=0x10c0f300, valid=1
+es:s=0x0017, dl=0x00003fff, dh=0x10c0f300, valid=1
+fs:s=0x0017, dl=0x00003fff, dh=0x10c0f300, valid=1
+gs:s=0x0017, dl=0x00003fff, dh=0x10c0f300, valid=1
+ldtr:s=0x0068, dl=0x72d00068, dh=0x000082fa, valid=1
+tr:s=0x0060, dl=0x72e80068, dh=0x00008bfa, valid=1
+gdtr:base=0x00005cb8, limit=0x7ff
+idtr:base=0x000054b8, limit=0x7ff
+<bochs:10> calc ds:0x3004
+0x10003004 268447748
+<bochs:11> creg
+CR0=0x8000001b: PG cd nw ac wp ne ET TS em MP PE
+CR2=page fault laddr=0x10002fac
+CR3=0x00000000
+    PCD=page-level cache disable=0
+    PWT=page-level writes transparent=0
+CR4=0x00000000: osxmmexcpt osfxsr pce pge mce pae pse de tsd pvi vme
+<bochs:12> xp /68w 0
+[bochs]:
+0x00000000 <bogus+       0>:	0x00001027	0x00002007	0x00003007	0x00004027
+0x00000010 <bogus+      16>:	0x00000000	0x000249dc	0x00000000	0x00000000
+0x00000020 <bogus+      32>:	0x00000000	0x00000000	0x00000000	0x00000000
+0x00000030 <bogus+      48>:	0x00000000	0x00000000	0x00000000	0x00000000
+0x00000040 <bogus+      64>:	0x00ffe027	0x00000000	0x00000000	0x00000000
+0x00000050 <bogus+      80>:	0x00000000	0x00000000	0x00000000	0x00000000
+0x00000060 <bogus+      96>:	0x00000000	0x00000000	0x00000000	0x00000000
+0x00000070 <bogus+     112>:	0x00000000	0x00000000	0x00000000	0x00000000
+0x00000080 <bogus+     128>:	0x00ff3027	0x00000000	0x00000000	0x00000000
+0x00000090 <bogus+     144>:	0x00000000	0x00000000	0x00000000	0x00000000
+0x000000a0 <bogus+     160>:	0x00000000	0x00000000	0x00000000	0x00000000
+0x000000b0 <bogus+     176>:	0x00000000	0x00000000	0x00000000	0x00ffb027
+0x000000c0 <bogus+     192>:	0x00ff6027	0x00000000	0x00000000	0x00000000
+0x000000d0 <bogus+     208>:	0x00000000	0x00000000	0x00000000	0x00000000
+0x000000e0 <bogus+     224>:	0x00000000	0x00000000	0x00000000	0x00000000
+0x000000f0 <bogus+     240>:	0x00000000	0x00000000	0x00000000	0x00ffa027
+0x00000100 <bogus+     256>:	0x00faa027	0x00000000	0x00000000	0x00000000
+<bochs:13> xp /w 0+64*4
+[bochs]:
+0x00000100 <bogus+       0>:	0x00faa027
+<bochs:14> xp /w 0x00faa000+3*4
+[bochs]:
+0x00faa00c <bogus+       0>:	0x00fa9067
+<bochs:15> page 0x10003004
+linear page 0x10003000 maps to physical page 0x00fa9000
+<bochs:16> xp /w 0x00fa9004
+[bochs]:
+0x00fa9004 <bogus+       0>:	0x12345678
+<bochs:17> setpmem 0x00fa9004 4 0
+<bochs:18> c
+
+
+问题2.
+答：退出后再运行和跟踪，发现页表物理地址不同了，可见页表分配是随机的。运行结果如下：
+<bochs:13> xp /w 0+64*4
+[bochs]:
+0x00000100 <bogus+       0>:	0x00fa6027
