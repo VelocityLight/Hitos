@@ -1,0 +1,54 @@
+内核级线程：
+
+
+int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine) (void *), void *arg); 
+该函数用来创建一个线程。attr是创建线程时使用的各种属性，由pthread_attr_init()设定。当该线程被调度时会从函数start_routine（一段用户态代码）开始执行。arg做为参数被传递给start_routine。start_routine的原型为：
+
+void * start_routine(void *arg);
+如果线程创建成功，返回值0，并且把线程的ID值存放在thread中；当创建不成功时会返回一个错误号：EAGAIN表示系统缺乏足够的资源来创建线程，EINVAL表示attr结构中的属性值非法。
+
+pthread_exit
+
+void pthread_exit(void *value_ptr);
+将调用该函数的线程销毁。它没有返回值，因为调用它的线程已经销毁，所以返回值没有任何地方可以“返回”。value_ptr是传给父线程的返回值，父线程调用pthread_join()可得到这个值。这是线程主动终止的唯一方式。
+
+pthread_join
+
+int pthread_join(pthread_t thread, void **value_ptr);
+将调用它的线程阻塞，一直等到thread结束为止。其中thread为被等待的线程ID，value_ptr会接收到被等待线程通过pthread_exit()设置的返回值。
+
+实验报告[编辑]
+
+如实现了内核级线程，请在实验报告中说明你的实现方法和编译步骤。如只完成了用户态应用，则在实验报告中说明你是如何实现abort功能的。
+
+评分标准[编辑]
+
+在ubuntu等成熟版本linux上面用线程实现了那个应用，总得分30%
+在Linux 0.11上通过改造现有的PCB，即没有创建TCB而实现的内核级线程，并且使用线程实现了那个应用，总得分70%
+在Linux 0.11上实现了用户级线程，并实现了那个应用，总得分90%
+在Linux 0.11上通过创建TCB而实现内核级线程，并且使用线程系统调用实现了那个应用，总得分100%
+实验提示[编辑]
+
+Pointers to Linux 0.11 code, Internet and your brain
+
+内核级线程流派
+
+内核级线程的实现主要有三个流派。
+
+一个流派以Windows和Solaris为代表，线程是系统调度和管理执行体的基本单位，而进程的功能弱化为单纯的资源管理。每个进程至少有一个线程，同一个进程之内的线程通过PCB共享资源。
+
+另一个流派以Linux和FreeBSD（移植的Linux线程库）为代表，仍然以进程为调度和资源管理的基本单位，但允许不同的进程之间共享全部虚拟地址空间。这样，共享地址空间的进程们只要再拥有自己独立的栈，就像线程一样了。这种实现方法叫做轻量级进程（Light Weight Process）。相对第一个流派而言，它的效率比较低。
+
+最后一个流派其实是将进程与线程完全揉合在一起，多见于嵌入式系统中。在这种方式下，所有的进程都共享同一个地址空间，这样它们每一个都相当于一个线程。
+
+如何使用函数库
+
+如果将pthread.h和pthread.c看做是一个库，那么在memtest.c中包含pthread.h，然后用如下命令编译：
+
+gcc -Wall -o memtest memtest.c pthread.c
+这样，memtest.c和pthread.c就一起被编译、链接到了memtest。
+
+理论上，memtest.c应该可以在任何内核版本大于2.6的系统上编译。在这样的系统上使用系统自带pthread库的方法是：
+
+gcc -Wall -o memtest memtest.c -lpthread
+memtest是一个可在Linux下运行的示例，供参考。

@@ -1,0 +1,3 @@
+abort功能：
+我是通过pthread_join(pthread_t p,NULL)将p线程阻塞，直到线程停止，返回值为NULL。
+另一种方法是调用系统接口pthread_cancel()函数向线程发送中止信号，通过pthread_setcancelstate()和pthread_setcanceltype()设置信号。
